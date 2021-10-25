@@ -8,6 +8,7 @@ from socket import *
 from select import select
 
 upperServerAddr = ("", 50000)   # any addr, port 50,000
+lowerServerAddr = ("", 50001)
 
 def uppercase(sock):
   "run this function when sock has rec'd a message"
@@ -15,11 +16,22 @@ def uppercase(sock):
   print("from %s: rec'd '%s'" % (repr(clientAddrPort), message))
   modifiedMessage = message.decode().upper().encode()
   sock.sendto(modifiedMessage, clientAddrPort)
+
+def lowercase(sock):
+  "run this function when sock has rec'd a message"
+  message, clientAddrPort = sock.recvfrom(2048)
+  print("from %s: rec'd '%s'" % (repr(clientAddrPort), message))
+  modifiedMessage = message.decode().lower().encode()
+  sock.sendto(modifiedMessage, clientAddrPort)
   
 
 upperServerSocket = socket(AF_INET, SOCK_DGRAM)
 upperServerSocket.bind(upperServerAddr)
 upperServerSocket.setblocking(False)
+
+lowerServerSocket = socket(AF_INET, SOCK_DGRAM)
+lowerServerSocket.bind(lowerServerAddr)
+lowerServerSocket.setblocking(False)
 
 # map socket to function to call when socket is....
 readSockFunc = {}               # ready for reading
@@ -30,6 +42,7 @@ timeout = 5                     # select delay before giving up, in seconds
 
 # function to call when upperServerSocket is ready for reading
 readSockFunc[upperServerSocket] = uppercase
+readSockFunc[lowerServerSocket] = lowercase
 
 print("ready to receive")
 while 1:
