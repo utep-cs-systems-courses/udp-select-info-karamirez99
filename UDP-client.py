@@ -22,7 +22,7 @@ try:
             serverAddr = (addr, int(port)) # addr can be a string (yippie)
         else:
             print("unexpected parameter %s" % args[0])
-            usage();
+            usage()
 except:
     usage()
 

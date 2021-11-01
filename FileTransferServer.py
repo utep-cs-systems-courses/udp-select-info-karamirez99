@@ -32,10 +32,23 @@ print("binding datagram socket to %s" % repr(serverAddr))
 serverSocket.bind(serverAddr)
 
 print("ready to receive")
+
+segmentNum = 0
+newFile = open("temp.txt", "w", encoding="utf-8")
 while 1:
     message, clientAddrPort = serverSocket.recvfrom(2048)
+    isEnd = int.from_bytes(message[0:1], "little")
+    segmentNumFrom = int.from_bytes(message[1:3], "little")
+
+    if isEnd == 1:
+        serverSocket.shutdown(0)
+        break
+
+    newFile.write(message[3:].decode("utf-8"))
+    serverSocket.sendto(segmentNum.to_bytes(2, "little"), clientAddrPort)
+    segmentNum += 1
+
     print("from %s: rec'd <%s>" % (repr(clientAddrPort), repr(message)))
-    modifiedMessage = message.decode().upper().encode()
-    serverSocket.sendto(modifiedMessage, clientAddrPort)
     
                 
+newFile.close()
