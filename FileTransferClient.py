@@ -25,7 +25,7 @@ def sendData(socket: socket, data):
             terminate = True
 
         segment = continueNumber.to_bytes(1, 'little') + segmentNumber.to_bytes(2, 'little') + segment
-
+        print(continueNumber.to_bytes(1, 'little'))
         socket.sendto(segment, serverAddr)
 
 
@@ -41,6 +41,17 @@ def verifyReceive(socket:socket, numberToCheck):
             break
 
     
+def sendFileStart(socket:socket, fileName: str, serverAddr):
+    protocol = 0
+    msg = protocol.to_bytes(1, 'little') + fileName.encode()
+    socket.sendto(msg, serverAddr)
+
+    msg, serverAddr = socket.recvfrom(2048)
+    if msg.decode() == "OK":
+        return True
+    else:
+        return False
+
 
 def usage():
     print("usage: %s [--serverAddr host:port]"  % sys.argv[0])
@@ -64,8 +75,8 @@ print("serverAddr = %s" % repr(serverAddr))
 clientSocket = socket(AF_INET, SOCK_DGRAM)
 fileName = input("Enter the file to transfer")
 data = open(fileName, "r", encoding='utf-8')
-sendData(clientSocket, data)
-
-# clientSocket.sendto(message.encode(), serverAddr)
-# modifiedMessage, serverAddrPort = clientSocket.recvfrom(2048)
-# print('Modified message from %s is "%s"' % (repr(serverAddrPort), modifiedMessage.decode()))
+goodToGo = sendFileStart(clientSocket, fileName, serverAddr)
+if goodToGo:
+    sendData(clientSocket, data)
+else:
+    print("couldn't Transfer")
