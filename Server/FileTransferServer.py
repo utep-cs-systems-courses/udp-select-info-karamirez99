@@ -1,31 +1,33 @@
 #! /usr/bin/env python3
-# udp demo -- simple select-driven uppercase server
 
-# Eric Freudenthal with mods by Adrian Veliz
-
-import sys
 from socket import *
 from select import select
 
-file = None
-segmentNum = 0
-state = "newConnection"
-serverAddr = ("", 50000)  
+clients = {}
+serverAddr = ("", 50001)  
 serverSocket = socket(AF_INET, SOCK_DGRAM) # new datagram socket for communicating to an IP addr
 serverSocket.bind(serverAddr)
 serverSocket.setblocking(False)
 
   
+class serverState:
+    def __init__(self):
+        self.file = None
+        self.segmentNum = 0
+        self.state = "newConnection"
+        self.tries = 3
+
 def getProtocol(socket):
-    global state
-    global file
+    client = clients[socket]
+
     message, clientAddrPort = socket.recvfrom(2048)
     protocol = int.from_bytes(message[0:1], "little")
     fileName = message[1:].decode()
+
     if protocol == 0:
         socket.sendto(b"OK", clientAddrPort)
-        state = "transferReceive"
-        file = open(fileName, "w")
+        client.state = "transferReceive"
+        client.file = open(fileName, "wb")
     elif protocol == 1:
         #TODO Implement recv file
         pass
@@ -34,9 +36,10 @@ def getProtocol(socket):
     
 
 def fileTransfer(socket):
-    global state
-    global segmentNum
-    global file
+    client = clients[socket]
+    state = client.state
+    segmentNum = client.segmentNum
+    file = client.file
 
     if state != "transferReceive":
         return
@@ -46,21 +49,28 @@ def fileTransfer(socket):
     segmentNumFrom = int.from_bytes(message[1:3], "little")
 
     if isEnd == 1:
-        state = "done"
+        client.state = "done"
         socket.sendto(segmentNum.to_bytes(2, "little"), clientAddrPort)
         file.close()
         return
 
     if(segmentNumFrom != segmentNum):
-        pass
+        lastSent = segmentNum - 1
+        socket.sendto(lastSent.to_bytes(2, "little"), clientAddrPort)
         #Ignore Invalid packets
     else:
-        file.write(message[3:].decode("utf-8"))
+        file.write(message[3:])
         socket.sendto(segmentNum.to_bytes(2, "little"), clientAddrPort)
-        segmentNum += 1
+        client.segmentNum += 1
         
 
 def readData(socket):
+    client = clients[socket]
+    state = client.state
+    segmentNum = client.segmentNum
+
+    print(state)
+
     if state == "newConnection":
         getProtocol(socket)
     elif state == "transferReceive":
@@ -87,7 +97,18 @@ while 1:
                                                 list(errorSockFunc.keys()),
                                                 timeout)
   if not readRdySet and not writeRdySet and not errorRdySet:
-    print("timeout: no events")
-  for sock in readRdySet:
-    readSockFunc[sock](sock)
+    clientsToRemove = []
+    for sock, status in clients.items():
+        status.tries -= 1
+        if status.tries <= 0:
+            clientsToRemove.append(sock)
+    for client in clientsToRemove:
+        clients.pop(client)
 
+    print("timeout: no events")
+    
+  for sock in readRdySet:
+    if sock not in clients:
+        clients[sock] =  serverState()
+    clients[sock].tries = 3
+    readSockFunc[sock](sock)
